@@ -1,6 +1,6 @@
 import { Variant, TankPacket, TextPacket } from "growtopia.js";
 import { Listener } from "../abstracts/Listener";
-import { ActionType } from "../types/action";
+import { ActionType, DroppedItem } from "../types";
 import { BaseServer } from "../structures/BaseServer";
 import { DataTypes } from "../utils/enums/DataTypes";
 import { decrypt, find, parseAction } from "../utils/Utils";
@@ -10,7 +10,6 @@ import { ActionTypes } from "../utils/enums/Tiles";
 import { ClothTypes } from "../utils/enums/ItemTypes";
 import { DialogBuilder } from "../utils/builders/DialogBuilder";
 import { World } from "../structures/World";
-import { DroppedItem } from "../types/world";
 import { Place } from "../tanks/Place";
 import { Punch } from "../tanks/Punch";
 import { Player } from "../tanks/Player";
@@ -45,10 +44,10 @@ export default class extends Listener<"raw"> {
         if (parsed?.requestedName && parsed?.tankIDName && parsed?.tankIDPass) {
           const username = parsed.tankIDName as string;
           const password = parsed.tankIDPass as string;
-          this.base.database.getUser(username).then((user) => {
+          this.base.database.getUser(username.toLowerCase()).then((user) => {
             if (!user || password !== decrypt(user?.password)) {
               peer.send(Variant.from("OnConsoleMessage", "`4Failed`` logging in to that account. Please make sure you've provided the correct info."));
-              peer.send(TextPacket.from(DataTypes.ACTION, "action|set_url", "url||https://127.0.0.1/recover", "label|`$Recover your Password``"));
+              peer.send(TextPacket.from(DataTypes.ACTION, "action|set_url", "url||http://127.0.0.1/recover", "label|`$Recover your Password``"));
               return peer.disconnect();
             }
 
@@ -69,7 +68,7 @@ export default class extends Listener<"raw"> {
                 "cc.cz.madkite.freedom org.aqua.gg idv.aqua.bulldog com.cih.gamecih2 com.cih.gamecih com.cih.game_cih cn.maocai.gamekiller com.gmd.speedtime org.dax.attack com.x0.strai.frep com.x0.strai.free org.cheatengine.cegui org.sbtools.gamehack com.skgames.traffikrider org.sbtoods.gamehaca com.skype.ralder org.cheatengine.cegui.xx.multi1458919170111 com.prohiro.macro me.autotouch.autotouch com.cygery.repetitouch.free com.cygery.repetitouch.pro com.proziro.zacro com.slash.gamebuster",
                 "proto=204|choosemusic=audio/mp3/about_theme.mp3|active_holiday=6|wing_week_day=0|ubi_week_day=0|server_tick=638729041|clash_active=0|drop_lavacheck_faster=1|isPayingUser=0|usingStoreNavigation=1|enableInventoryTab=1|bigBackpack=1|"
               ),
-              Variant.from("SetHasGrowID", 1, user.name, decrypt(user.password)),
+              Variant.from("SetHasGrowID", 1, user.display_name, decrypt(user.password)),
               Variant.from("SetHasAccountSecured", 1)
             );
 
@@ -100,7 +99,7 @@ export default class extends Listener<"raw"> {
               ances: 0
             };
 
-            peer.data.tankIDName = user.name;
+            peer.data.tankIDName = user.display_name;
             peer.data.rotatedLeft = false;
             // peer.data.requestedName = parsed.requestedName as string;
             peer.data.country = parsed?.country as string;
@@ -112,9 +111,20 @@ export default class extends Listener<"raw"> {
             peer.data.world = "EXIT";
             peer.data.level = user.level ? user.level : 0;
             peer.data.exp = user.exp ? user.exp : 0;
+            peer.data.lastVisitedWorlds = user.last_visited_worlds ? JSON.parse(user.last_visited_worlds.toString()) : [];
+            peer.data.state = {
+              mod: 0,
+              canWalkInBlocks: false,
+              modsEffect: 0,
+              lava: {
+                damage: 0,
+                resetStateAt: 0
+              }
+            };
 
             // Load Gems
             peer.send(Variant.from("OnSetBux", peer.data.gems));
+            peer.checkModsEffect();
 
             peer.saveToCache();
             peer.saveToDatabase();
@@ -144,7 +154,7 @@ export default class extends Listener<"raw"> {
             this.base.log.debug("Unknown tank", tank);
             break;
           }
-          case TankTypes.PEER_ICON: {
+          case TankTypes.SET_ICON_STATE: {
             tank.data.state = peer.data?.rotatedLeft ? 16 : 0;
 
             peer.everyPeer((p) => {
@@ -155,7 +165,7 @@ export default class extends Listener<"raw"> {
             break;
           }
 
-          case TankTypes.PEER_CLOTH: {
+          case TankTypes.ITEM_ACTIVATE_REQUEST: {
             tank.data.state = peer.data?.rotatedLeft ? 16 : 0;
             const item = this.base.items.metadata.items.find((v) => v.id === tank.data?.info);
 
@@ -252,13 +262,15 @@ export default class extends Listener<"raw"> {
               }
             }
 
+            peer.checkModsEffect(true, tank);
+
             peer.saveToCache();
             peer.saveToDatabase();
             peer.sendClothes();
             break;
           }
 
-          case TankTypes.PEER_MOVE: {
+          case TankTypes.STATE: {
             if (peer.data?.world === "EXIT") break;
             const world = peer.hasWorld(peer.data.world) as World;
             tank.data.netID = peer.data?.netID;
@@ -273,12 +285,12 @@ export default class extends Listener<"raw"> {
                 p.send(tank);
               }
             });
-            
+
             const player = new Player(this.base, peer, tank, world);
             player.onPlayerMove();
             break;
           }
-          case TankTypes.TILE_PUNCH: {
+          case TankTypes.TILE_CHANGE_REQUEST: {
             const world = peer.hasWorld(peer.data.world) as World;
             tank.data.netID = peer.data?.netID;
 
@@ -299,7 +311,7 @@ export default class extends Listener<"raw"> {
             break;
           }
 
-          case TankTypes.PEER_COLLECT: {
+          case TankTypes.ITEM_ACTIVATE_OBJECT_REQUEST: {
             const world = peer.hasWorld(peer.data.world);
             const dropped = world?.data.dropped?.items.find((i) => i.uid === tank.data?.info) as DroppedItem;
 
@@ -307,7 +319,7 @@ export default class extends Listener<"raw"> {
             break;
           }
 
-          case TankTypes.PEER_ENTER_DOOR: {
+          case TankTypes.TILE_ACTIVATE_REQUEST: {
             if (peer.data?.world === "EXIT") return;
 
             const world = peer.hasWorld(peer.data.world);

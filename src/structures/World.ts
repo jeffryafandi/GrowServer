@@ -1,7 +1,5 @@
 import { Tank, TankPacket, TextPacket, Variant } from "growtopia.js";
-import { PeerDataType } from "../types/peer";
-import { Flags } from "../utils/enums/Tiles";
-import { Block, EnterArg, Place, WorldData } from "../types/world";
+import type { Block, EnterArg, Place, WorldData } from "../types";
 import { BaseServer } from "./BaseServer";
 import { WORLD_SIZE, Y_END_DIRT, Y_LAVA_START, Y_START_DIRT } from "../utils/Constants";
 import { TankTypes } from "../utils/enums/TankTypes";
@@ -19,10 +17,7 @@ export class World {
   };
   public worldName;
 
-  constructor(
-    private base: BaseServer,
-    worldName: string
-  ) {
+  constructor(private base: BaseServer, worldName: string) {
     this.base = base;
     this.worldName = worldName;
   }
@@ -78,7 +73,7 @@ export class World {
     peer.everyPeer((p) => {
       if (p.data?.world === this.data.name && p.data?.world !== "EXIT") {
         const packet = TankPacket.from({
-          type: TankTypes.PEER_DROP,
+          type: TankTypes.ITEM_CHANGE_OBJECT,
           netID: peer.data?.netID,
           state,
           info: id,
@@ -96,7 +91,7 @@ export class World {
 
   public leave(peer: Peer, sendMenu = true) {
     this.data.playerCount ? this.data.playerCount-- : 0;
-    
+
     peer.data.lastCheckpoint = undefined;
 
     peer.send(TextPacket.from(DataTypes.ACTION, "action|play_sfx", "file|audio/door_shut.wav", "delayMS|0"));
@@ -110,7 +105,36 @@ export class World {
         );
     });
 
-    if (sendMenu) peer.send(Variant.from({ delay: 500 }, "OnRequestWorldSelectMenu"), Variant.from({ delay: 500 }, "OnConsoleMessage", "Where do you want to go?"));
+    if (sendMenu)
+      peer.send(
+        Variant.from(
+          { delay: 500 },
+          "OnRequestWorldSelectMenu",
+          `
+add_heading|Top Worlds|
+add_floater|START|0|0.5|3529161471
+add_floater|START1|0|0.5|3529161471
+add_floater|START2|0|0.5|3529161471
+${Array.from(this.base.cache.worlds.values())
+  .sort((a, b) => (b.playerCount || 0) - (a.playerCount || 0))
+  .slice(0, 6)
+  .map((v) => {
+    if (v.playerCount) return `add_floater|${v.name}${v.playerCount ? ` (${v.playerCount})` : ""}|0|0.5|3529161471\n`;
+    else return "";
+  })
+  .join("\n")}
+add_heading|Recently Visited Worlds<CR>|
+${peer.data.lastVisitedWorlds
+  ?.reverse()
+  .map((v) => {
+    const count = this.base.cache.worlds.get(v)?.playerCount || 0;
+    return `add_floater|${v}${count ? ` (${count})` : ""}|0|0.5|3417414143\n`;
+  })
+  .join("\n")}
+`
+        ),
+        Variant.from({ delay: 500 }, "OnConsoleMessage", "Where do you want to go?")
+      );
 
     peer.data.world = "EXIT";
     this.saveToCache();
@@ -153,7 +177,7 @@ export class World {
     if (typeof y !== "number") y = -1;
 
     const tank = TankPacket.from({
-      type: TankTypes.PEER_WORLD,
+      type: TankTypes.SEND_MAP_DATA,
       state: 8,
       data: () => {
         const HEADER_LENGTH = this.worldName.length + 20;
@@ -347,7 +371,7 @@ export class World {
 
   public drop(peer: Peer, x: number, y: number, id: number, amount: number, { tree, noSimilar }: { tree?: boolean; noSimilar?: boolean } = {}) {
     const tank = TankPacket.from({
-      type: TankTypes.PEER_DROP,
+      type: TankTypes.ITEM_CHANGE_OBJECT,
       netID: -1,
       targetNetID: tree ? -1 : peer.data?.netID,
       state: 0,
@@ -415,7 +439,7 @@ export class World {
         p.data?.world !== "EXIT" &&
         p.send(
           TankPacket.from({
-            type: TankTypes.PEER_DROP,
+            type: TankTypes.ITEM_CHANGE_OBJECT,
             netID: peer.data?.netID,
             targetNetID: -1,
             info: uid
@@ -471,7 +495,7 @@ export class World {
           p.data?.world !== "EXIT" &&
           p.send(
             TankPacket.from({
-              type: TankTypes.TILE_TREE,
+              type: TankTypes.SEND_TILE_TREE_STATE,
               netID: peer.data?.netID,
               targetNetID: -1,
               xPunch: block.x,
@@ -483,21 +507,5 @@ export class World {
       return true;
     }
     return false;
-  }
-
-  public add_lock_data_to_packet(block: Block, buffer: Buffer) {
-    if (!block.lock) return;
-    const newBuf = Buffer.alloc(buffer.length + 2);
-    buffer.copy(newBuf, 0, 0, 8);
-
-    const lockPos = (block.lock.ownerX as number) + (block.lock.ownerY as number) * this.data.width;
-    const flag = newBuf.readUInt16LE(6);
-
-    newBuf.writeUInt16LE(lockPos, 4);
-    newBuf.writeUInt16LE(flag | Flags.FLAGS_LOCKED, 6);
-    newBuf.writeUInt16LE(lockPos, 8);
-
-    buffer.copy(newBuf, 10, 8);
-    return newBuf;
   }
 }

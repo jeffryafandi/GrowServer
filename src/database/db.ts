@@ -1,7 +1,5 @@
 import knex from "knex";
-import { User } from "../types/database";
-import { PeerDataType } from "../types/peer";
-import { WorldData, WorldDB } from "../types/world";
+import { User, PeerDataType, WorldData, WorldDB } from "../types";
 import { encrypt } from "../utils/Utils";
 
 export class Database {
@@ -41,7 +39,8 @@ export class Database {
           clothing: Buffer.from(JSON.stringify(data.clothing)),
           gems: data.gems,
           level: data.level,
-          exp: data.exp
+          exp: data.exp,
+          last_visited_worlds: Buffer.from(JSON.stringify(data.lastVisitedWorlds))
         },
         []
       );
@@ -53,7 +52,7 @@ export class Database {
   public async createUser(username: string, password: string) {
     const encPass = encrypt(password);
 
-    const res = await this.knex("users").insert({ name: username, password: encPass, role: "2" });
+    const res = await this.knex("users").insert({ display_name: username, name: username.toLowerCase(), password: encPass, role: "2" });
 
     if (res.length) return res[0];
     return undefined;
