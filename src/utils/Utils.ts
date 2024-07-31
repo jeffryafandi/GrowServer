@@ -1,9 +1,9 @@
 import CryptoJS from "crypto-js";
-import { BaseServer } from "../structures/BaseServer";
-import { Peer } from "../structures/Peer";
-import { Collection } from "../structures/Collection";
-import { PeerDataType } from "../types";
-import { World } from "../structures/World";
+import type { BaseServer } from "../structures/BaseServer.js";
+import { Peer } from "../structures/Peer.js";
+import { Collection } from "../structures/Collection.js";
+import type { PeerDataType } from "../types";
+import { World } from "../structures/World.js";
 
 export function parseAction(chunk: Buffer): Record<string, string | number> | undefined {
   const data: Record<string, string | number> = {};
@@ -105,57 +105,14 @@ export function manageArray(arr: string[], length: number, newItem: string): str
   return arr;
 }
 
-export class Color {
-  private colors: Uint8Array = new Uint8Array(4);
+export function parseQueryString(query: string): { [key: string]: string } {
+  const queryObj: { [key: string]: string } = {};
+  const pairs: string[] = query.split("&");
 
-  constructor(r: number, g: number, b: number, a: number = 255) {
-    if (r < 0 || r > 255 || g < 0 || g > 255 || b < 0 || b > 255 || a < 0 || a > 255) {
-      throw new Error("Invalid color values. Each value must be between 0 and 255.");
-    }
+  pairs.forEach((pair) => {
+    const [key, value] = pair.split("=");
+    queryObj[decodeURIComponent(key)] = decodeURIComponent(value || "");
+  });
 
-    this.colors[0] = b;
-    this.colors[1] = g;
-    this.colors[2] = r;
-    this.colors[3] = a;
-  }
-
-  public getUint(): number {
-    let result = 0;
-    for (let index = 0; index < this.colors.length; index++) {
-      result = (result << 8) + this.colors[index];
-    }
-    return result;
-  }
-
-  public setRed(col: number): void {
-    this.colors[2] = col;
-  }
-
-  public red(): number {
-    return this.colors[2];
-  }
-
-  public setGreen(col: number): void {
-    this.colors[1] = col;
-  }
-
-  public green(): number {
-    return this.colors[1];
-  }
-
-  public setBlue(col: number): void {
-    this.colors[0] = col;
-  }
-
-  public blue(): number {
-    return this.colors[0];
-  }
-
-  public setAlpha(col: number): void {
-    this.colors[3] = col;
-  }
-
-  public alpha(): number {
-    return this.colors[3];
-  }
+  return queryObj;
 }

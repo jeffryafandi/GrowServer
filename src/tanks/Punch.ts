@@ -1,13 +1,14 @@
-import { ItemDefinition, Tank, TankPacket, Variant } from "growtopia.js";
-import { BaseServer } from "../structures/BaseServer";
-import { Peer } from "../structures/Peer";
-import { World } from "../structures/World";
-import { Block } from "../types";
-import { Role } from "../utils/Constants";
-import { TankTypes } from "../utils/enums/TankTypes";
-import { ActionTypes } from "../utils/enums/Tiles";
-import { Place } from "./Place";
+import { type ItemDefinition, type Tank, TankPacket, Variant } from "growtopia.js";
+import { BaseServer } from "../structures/BaseServer.js";
+import { Peer } from "../structures/Peer.js";
+import { World } from "../structures/World.js";
+import type { Block } from "../types";
+import { Role } from "../utils/Constants.js";
+import { TankTypes } from "../utils/enums/TankTypes.js";
+import { ActionTypes } from "../utils/enums/Tiles.js";
+import { Place } from "./Place.js";
 import { Chance } from "chance";
+import { getWeatherId } from "../utils/builders/WeatherBuilder.js";
 
 export class Punch {
   public base: BaseServer;
@@ -23,8 +24,7 @@ export class Punch {
   }
 
   public onPunch() {
-    const tankData = this.tank.data as Tank;
-    const pos = (tankData.xPunch as number) + (tankData.yPunch as number) * this.world.data.width;
+    const pos = (this.tank.data?.xPunch as number) + (this.tank.data?.yPunch as number) * this.world.data.width;
     const block = this.world.data.blocks[pos];
     const itemMeta = this.base.items.metadata.items[block.fg || block.bg];
 
@@ -55,9 +55,9 @@ export class Punch {
     }
 
     if (block.damage >= (itemMeta.breakHits as number)) {
-      this.onDestroyed(block, itemMeta, tankData);
+      this.onDestroyed(block, itemMeta);
     } else {
-      this.onDamaged(block, itemMeta, tankData);
+      this.onDamaged(block, itemMeta);
     }
 
     this.peer.send(this.tank);
@@ -72,9 +72,9 @@ export class Punch {
     return;
   }
 
-  private onDamaged(block: Block, itemMeta: ItemDefinition, tankData: Tank) {
-    tankData.type = TankTypes.TILE_APPLY_DAMAGE;
-    tankData.info = (block.damage as number) + 5;
+  private onDamaged(block: Block, itemMeta: ItemDefinition) {
+    (this.tank.data as Tank).type = TankTypes.TILE_APPLY_DAMAGE;
+    (this.tank.data as Tank).info = (block.damage as number) + 5;
 
     block.resetStateAt = Date.now() + (itemMeta.resetStateAfter as number) * 1000;
     (block.damage as number)++;
@@ -82,6 +82,48 @@ export class Punch {
     switch (itemMeta.type) {
       case ActionTypes.SEED: {
         this.world.harvest(this.peer, block);
+        break;
+      }
+
+      case ActionTypes.SWITCHEROO: {
+        Place.tileUpdate(this.base, this.peer, itemMeta?.type || 0, block, this.world);
+        if (block.toggleable) block.toggleable.open = !block.toggleable.open;
+
+        break;
+      }
+
+      case ActionTypes.WEATHER_MACHINE: {
+        // block.weather!.enabled = !block.weather!.enabled;
+
+        let weatherId = getWeatherId(itemMeta.id as number);
+        if (this.world.data.weatherId === weatherId) weatherId = 41; // to-do add: world.data.baseWeatherId
+
+        this.world.data.weatherId = weatherId;
+
+        this.peer.everyPeer((p) => {
+          if (this.peer.data.world === p.data.world && p.data.world !== "EXIT") {
+            p.send(Variant.from("OnSetCurrentWeather", this.world.data.weatherId));
+          }
+        });
+        this.world.saveToCache();
+        break;
+      }
+
+      case ActionTypes.DICE: {
+        block.dice = Math.floor(Math.random() * 6);
+        const tankData = this.tank.data as Tank;
+
+        tankData.xPos = this.peer.data.x;
+        tankData.yPos = this.peer.data.y;
+        tankData.targetNetID = this.peer.data.clothing.hand;
+        tankData.state = 16;
+        tankData.info = 7;
+
+        const diceTank = this.tank.parse() as Buffer;
+
+        diceTank.writeUint8(block.dice, 4 + 3);
+
+        this.tank = TankPacket.fromBuffer(diceTank);
         break;
       }
     }
@@ -123,15 +165,15 @@ export class Punch {
     });
   }
 
-  private onDestroyed(block: Block, itemMeta: ItemDefinition, tankData: Tank) {
+  private onDestroyed(block: Block, itemMeta: ItemDefinition) {
     block.damage = 0;
     block.resetStateAt = 0;
 
     if (block.fg) block.fg = 0;
     else if (block.bg) block.bg = 0;
 
-    tankData.type = TankTypes.TILE_CHANGE_REQUEST;
-    tankData.info = 18;
+    (this.tank.data as Tank).type = TankTypes.TILE_CHANGE_REQUEST;
+    (this.tank.data as Tank).info = 18;
 
     block.rotatedLeft = undefined;
 
@@ -176,6 +218,23 @@ export class Punch {
 
       case ActionTypes.HEART_MONITOR: {
         block.heartMonitor = undefined;
+        break;
+      }
+
+      case ActionTypes.SWITCHEROO: {
+        block.toggleable = undefined;
+        break;
+      }
+
+      case ActionTypes.WEATHER_MACHINE: {
+        block.toggleable = undefined;
+
+        this.world.data.weatherId = 41;
+        this.peer.everyPeer((p) => {
+          if (this.peer.data.world === p.data.world && p.data.world !== "EXIT") {
+            p.send(Variant.from("OnSetCurrentWeather", this.world.data.weatherId));
+          }
+        });
         break;
       }
 

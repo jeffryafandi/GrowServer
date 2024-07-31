@@ -1,14 +1,16 @@
 import { Peer as OldPeer, TankPacket, TextPacket, Variant } from "growtopia.js";
-import { PeerDataType, Block } from "../types";
-import { Role, WORLD_SIZE } from "../utils/Constants";
-import { DataTypes } from "../utils/enums/DataTypes";
-import { TankTypes } from "../utils/enums/TankTypes";
-import { BaseServer } from "./BaseServer";
-import { World } from "./World";
-import { ActionTypes } from "../utils/enums/Tiles";
-import { manageArray } from "../utils/Utils";
-import { ModsEffects, State } from "../utils/enums/Character";
-import { Player } from "../tanks/Player";
+import type { PeerDataType, Block } from "../types";
+import { Role, WORLD_SIZE } from "../utils/Constants.js";
+import { DataTypes } from "../utils/enums/DataTypes.js";
+import { TankTypes } from "../utils/enums/TankTypes.js";
+import { BaseServer } from "./BaseServer.js";
+import { World } from "./World.js";
+import { ActionTypes } from "../utils/enums/Tiles.js";
+import { manageArray } from "../utils/Utils.js";
+import { ModsEffects, State } from "../utils/enums/Character.js";
+import { Player } from "../tanks/Player.js";
+import { RiftCapeFlags, RiftWingsFlags } from "../utils/enums/ItemTypes.js";
+import { Color } from "./Color.js";
 
 export class Peer extends OldPeer<PeerDataType> {
   public base;
@@ -139,11 +141,11 @@ export class Peer extends OldPeer<PeerDataType> {
     this.sound("audio/teleport.wav", 2000);
   }
 
-  public enterWorld(worldName: string, x?: number, y?: number) {
+  public async enterWorld(worldName: string, x?: number, y?: number) {
     const world = this.hasWorld(worldName);
     const mainDoor = world?.data.blocks?.find((block) => block.fg === 6);
 
-    world?.enter(this, { x: x ? x : mainDoor?.x, y: y ? y : mainDoor?.y });
+    await world?.enter(this, { x: x ? x : mainDoor?.x, y: y ? y : mainDoor?.y });
     this.inventory();
     this.sound("audio/door_open.wav");
     this.checkModsEffect();
@@ -283,12 +285,11 @@ export class Peer extends OldPeer<PeerDataType> {
   }
 
   public checkModsEffect(withMsg = false, tank?: TankPacket) {
-    const world = this.hasWorld(this.data.world);
     let state = 0x0;
     let mods_effect = 0x0;
 
     // Clothing effects
-    Object.keys(this.data.clothing!).forEach((k) => {
+    Object.keys(this.data.clothing).forEach((k) => {
       // @ts-expect-error ignore keys type
       const itemInfo = this.base.items.wiki.find((i) => i.id === this.data.clothing[k]);
       const playMod = itemInfo?.playMod || "";
@@ -311,6 +312,41 @@ export class Peer extends OldPeer<PeerDataType> {
     this.data.state.mod = state;
     this.data.state.modsEffect = mods_effect;
     this.sendState();
+    this.addRift();
+  }
+
+  public addRift() {
+    // 10424 rift cape
+    // 11478 rift wing
+
+    let flags = 0;
+    let variantType = "";
+
+    if (this.data.clothing?.back === 10424) {
+      flags |= RiftCapeFlags.CAPE_COLLAR_0;
+      flags |= RiftCapeFlags.OPEN_ON_MOVE_0;
+      flags |= RiftCapeFlags.AURA_0;
+      flags |= RiftCapeFlags.AURA_1;
+      flags |= RiftCapeFlags.AURA_3RD_0;
+      flags |= RiftCapeFlags.AURA_1ST_1;
+      flags |= RiftCapeFlags.TIME_CHANGE;
+      variantType = "OnRiftCape";
+
+      const capeColor = new Color(0, 0, 255).toDecimal();
+      const colarColor = new Color(0, 255, 0).toDecimal();
+
+      this.send(Variant.from({ netID: this.data.netID }, variantType, flags, capeColor, capeColor, colarColor, colarColor, 4));
+    } else if (this.data.clothing?.back === 11478) {
+      // still not working (trying figuring out how this work)
+      flags |= RiftWingsFlags.OPEN_WING_0;
+      flags |= RiftWingsFlags.TIME_CHANGE;
+
+      variantType = "OnRiftWings";
+
+      const capeColor = new Color(0, 0, 255).toDecimal();
+
+      this.send(Variant.from({ netID: this.data.netID }, variantType, flags, capeColor, capeColor, 0, 0, 4));
+    }
   }
 
   public addExp(amount: number): void {
@@ -334,5 +370,26 @@ export class Peer extends OldPeer<PeerDataType> {
       });
       this.countryState();
     }
+  }
+
+  public modifyInventory(id: number, amount: number = 1) {
+    const item = this.data.inventory?.items.find((i) => i.id === id);
+
+    if (!item) {
+      if (amount < 0 || amount > 200) return 1;
+      else this.data.inventory?.items.push({ id, amount });
+    } else {
+      if (amount === 0) return item.amount; // return jumlah barang yg di cari yg ada di bp
+      if (item.amount + amount > 200 || item.amount + amount < 0) return 1;
+      else item.amount += amount;
+    }
+
+    this.inventory();
+    this.saveToCache();
+    return 0;
+  }
+
+  public searchItem(id: number) {
+    return this.data.inventory?.items.find((i) => i.id === id);
   }
 }

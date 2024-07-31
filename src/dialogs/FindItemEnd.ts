@@ -1,8 +1,8 @@
 import { Variant } from "growtopia.js";
-import { Dialog } from "../abstracts/Dialog";
-import { BaseServer } from "../structures/BaseServer";
-import { Peer } from "../structures/Peer";
-import { DialogReturnType } from "../types";
+import { Dialog } from "../abstracts/Dialog.js";
+import { BaseServer } from "../structures/BaseServer.js";
+import { Peer } from "../structures/Peer.js";
+import type { DialogReturnType } from "../types";
 
 export default class extends Dialog {
   constructor(base: BaseServer) {
@@ -23,7 +23,7 @@ export default class extends Dialog {
   ): void {
     const itemID = parseInt(action.buttonClicked);
     peer.data?.inventory?.items.push({ id: itemID, amount: 200 });
-    peer.send(Variant.from("OnConsoleMessage", `Added \`6${this.base.items.metadata.items.find((v) => v.id === itemID)?.name}\`\` to your inventory.`));
+    peer.send(Variant.from("OnConsoleMessage", `Added \`6${this.base.items.metadata.items.find((v) => v.id === itemID)?.name?.value}\`\` to your inventory.`));
     peer.inventory();
     peer.saveToCache();
     // peer.saveToDatabase();

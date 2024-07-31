@@ -1,20 +1,29 @@
 import fs from "node:fs";
 import { Client } from "growtopia.js";
-import { WebServer } from "./Webserver";
-import { hashItemsDat } from "../utils/Utils";
-import { Action } from "../abstracts/Action";
+import { WebServer } from "./Webserver.js";
+import { hashItemsDat } from "../utils/Utils.js";
+import { Action } from "../abstracts/Action.js";
 import { ItemsDat } from "growtopia.js";
-import { ItemsDatMeta } from "growtopia.js";
-import { Logger } from "./Logger";
-import { Command } from "../abstracts/Command";
-import { CooldownOptions, PeerDataType, Ignore, Lock, WorldData, WikiItems } from "../types";
-import { Dialog } from "../abstracts/Dialog";
-import { Database } from "../database/db";
-import { Collection } from "./Collection";
-import { ActionTypes } from "../utils/enums/Tiles";
+import type { ItemsDatMeta } from "growtopia.js";
+import { Logger } from "./Logger.js";
+import { Command } from "../abstracts/Command.js";
+import type { CooldownOptions, PeerDataType, Ignore, Lock, WorldData, WikiItems } from "../types";
+import { Dialog } from "../abstracts/Dialog.js";
+import { Database } from "../database/db.js";
+import { Collection } from "./Collection.js";
+import { ActionTypes } from "../utils/enums/Tiles.js";
 import decompress from "decompress";
+import path from "path";
+import { fileURLToPath } from "url";
+import axios from "axios";
+import { WSServer } from "../websockets/server.js";
+import { Items } from "./Items.js";
+import { Config } from "../config.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export class BaseServer {
+  public config: typeof Config;
   public server: Client;
   public items;
   public action: Map<string, Action>;
@@ -29,8 +38,11 @@ export class BaseServer {
   public database;
   public locks: Lock[];
   public ignore: Ignore;
+  public cdn: { version: number; uri: string };
+  public wss?: WSServer;
 
   constructor() {
+    this.config = Config;
     this.server = new Client({ https: { enable: false } });
     this.items = {
       hash: `${hashItemsDat(fs.readFileSync("./assets/dat/items.dat"))}`,
@@ -43,7 +55,7 @@ export class BaseServer {
       users: new Collection(this),
       worlds: new Collection(this)
     };
-    this.log = new Logger();
+    this.log = new Logger(this);
     this.commands = new Map();
     this.cooldown = new Map();
     this.dialogs = new Map();
@@ -70,6 +82,7 @@ export class BaseServer {
       blockIDsToIgnoreByLock: [6, 8],
       blockActionTypesToIgnore: [ActionTypes.LOCK, ActionTypes.MAIN_DOOR]
     };
+    this.cdn = { version: 0, uri: "" };
   }
 
   public async start() {
@@ -79,21 +92,24 @@ export class BaseServer {
 
     this.#_loadItems().then(async () => {
       this.log.ready("Items data ready!");
-      await WebServer(this);
+      this.log.info("Fetching latest Growtopia Cache");
+      this.cdn = await this.getLatestCdn();
+
+      const web = await WebServer(this);
+      this.wss = new WSServer(this, web);
+      this.wss.start();
+
       await this.#_loadEvents();
       await this.#_loadActions();
-      this.log.action(`Loaded ${this.action.size} actions`);
       await this.#_loadCommands();
-      this.log.dialog(`Loaded ${this.commands.size} commands`);
       await this.#_loadDialogs();
-      this.log.dialog(`Loaded ${this.dialogs.size} dialogs`);
 
       this.server.listen();
     });
   }
 
   async #_loadEvents() {
-    fs.readdirSync(`${__dirname}/../events`).forEach(async (event) => {
+    await fs.readdirSync(`${__dirname}/../events`).forEach(async (event) => {
       const file = (await import(`../events/${event}`)).default;
       const initFile = new file(this);
       this.server.on(initFile.name, (...args) => initFile.run(...args));
@@ -102,28 +118,20 @@ export class BaseServer {
   }
 
   async #_loadItems() {
-    const items = await new ItemsDat(fs.readFileSync("./assets/dat/items.dat")).decode();
+    let itemsDat = new ItemsDat(fs.readFileSync("./assets/dat/items.dat"));
+    await itemsDat.decode();
 
-    const findItem = (id: number) => items.items.findIndex((v) => v.id === id);
+    try {
+      itemsDat = await Items.loadCustomItems(itemsDat);
+      this.log.info("Loaded custom items");
+    } catch (e) {
+      this.log.error(e);
+    }
 
-    // id 8900-8902
-    items.items[findItem(8900)].extraFile = "interface/large/banner.rttex";
-    items.items[findItem(8900)].extraFileHash = hashItemsDat(fs.readFileSync("./assets/cache/interface/large/banner.rttex"));
-    items.items[findItem(8902)].extraFile = "interface/large/banner-transparent.rttex";
-    items.items[findItem(8902)].extraFileHash = hashItemsDat(fs.readFileSync("./assets/cache/interface/large/banner-transparent.rttex"));
-
-    const encoded = await new ItemsDat().encode(items);
-    this.items.content = encoded;
-    this.items.hash = `${hashItemsDat(encoded)}`;
-
-    this.items.metadata = items;
-
-    // items.items.forEach((v) => {
-    //   if (v.extraFile) {
-    //     console.log(v);
-    //   }
-    // });
-    // this.items.metadata = items;
+    await itemsDat.encode();
+    this.items.content = itemsDat.data;
+    this.items.hash = `${hashItemsDat(itemsDat.data)}`;
+    this.items.metadata = itemsDat.meta;
   }
 
   async #_loadActions() {
@@ -148,5 +156,16 @@ export class BaseServer {
       const initFile = new file(this);
       this.commands.set(initFile.opt.name, initFile);
     });
+  }
+
+  async getLatestCdn() {
+    try {
+      const res = await axios.get("https://mari-project.jad.li/api/v1/growtopia/cache/latest");
+      if (res.status !== 200) return { version: 0, uri: "" };
+
+      return res.data as { version: number; uri: string };
+    } catch (e) {
+      return { version: 0, uri: "" };
+    }
   }
 }

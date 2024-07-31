@@ -4,15 +4,21 @@ import http from "node:http";
 import https from "node:https";
 import rateLimit from "express-rate-limit";
 import path from "node:path";
-import { BaseServer } from "./BaseServer";
-import axios from "axios";
-import { ApiRouter } from "../routes";
+import { BaseServer } from "./BaseServer.js";
+import { ApiRouter } from "../routes/index.js";
+import { fileURLToPath } from "url";
+import { PlayerRouter } from "../routes/player/index.js";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 
 const options = {
   key: readFileSync("./assets/ssl/server.key"),
   cert: readFileSync("./assets/ssl/server.crt")
+};
+const options2 = {
+  key: readFileSync("./assets/ssl/_wildcard.growserver.app-key.pem"),
+  cert: readFileSync("./assets/ssl/_wildcard.growserver.app.pem")
 };
 
 const apiLimiter = rateLimit({
@@ -23,65 +29,68 @@ const apiLimiter = rateLimit({
   legacyHeaders: false // Disable the `X-RateLimit-*` headers
 });
 
-export async function getLatestCdn() {
-  try {
-    const res = await axios.get("https://mari-project.jad.li/api/v1/growtopia/cache/latest");
-    if (res.status !== 200) return { version: 0, uri: "" };
-
-    return res.data as { version: number; uri: string };
-  } catch (e) {
-    return { version: 0, uri: "" };
-  }
-}
-
 export async function WebServer(server: BaseServer) {
   if (!existsSync("./assets/cache.zip")) throw new Error("Could not find 'cache.zip' file, please get one from growtopia 'cache' folder & compress the 'cache' folder into zip file.");
 
-  server.log.info("Fetching latest Growtopia Cache");
-  const cdn = await getLatestCdn();
-
-  app.set("view engine", "ejs");
-  app.set("views", path.join(__dirname, "../../../website/views"));
   app.use(express.urlencoded({ extended: true }));
   app.use(express.json());
-  app.use("/public", express.static(path.join(__dirname, "../../../website/public")));
+  app.use("/public", express.static(path.join(__dirname, "../../website/public")));
 
   if (existsSync("./assets/cache/cache")) {
-    app.use("/growtopia/cache", express.static(path.join(__dirname, "../../../assets/cache/cache")));
+    app.use("/growtopia/cache", express.static(path.join(__dirname, "../../assets/cache/cache")));
   } else {
-    app.use("/growtopia/cache", express.static(path.join(__dirname, "../../../assets/cache")));
+    app.use("/growtopia/cache", express.static(path.join(__dirname, "../../assets/cache")));
   }
 
-  app.get("/", (req, res) => {
-    res.render("home");
-  });
+  app.use("/", express.static(path.join(__dirname, "..", "..", "build")));
 
   app.use("/api", ApiRouter(server));
-  app.use("/growtopia/server_data.php", (req, res) => {
-    res.send(`server|${process.env.WEB_ADDRESS}\nport|17091\ntype|1\n#maint|Maintenance woi\nmeta|lolwhat\nRTENDMARKERBS1001`);
-  });
 
+  // New Login Sytem
+  app.use("/player", PlayerRouter(server));
+
+  app.use("/growtopia/server_data.php", (req, res) => {
+    let str = "";
+    const conf = server.config.webserver;
+
+    if (server.cdn.version === req.body.version) str += `server|${conf.address}\n`;
+    else {
+      str += `error|1000|Update is now available for your device.  Go get it!  You'll need to install it before you can play online.\nurl|${req.body.platform === "0" ? "https://growtopiagame.com/Growtopia-Installer.exe" : "market://details?id=com.rtsoft.growtopia"}\n`;
+    }
+    const randPort = conf.ports[Math.floor(Math.random() * conf.ports.length)];
+    str += `port|${randPort}\nloginurl|${conf.loginUrl}\ntype|1\n${conf.maintenance.enable ? "maint" : "#maint"}|${conf.maintenance.message}\nmeta|ignoremeta\nRTENDMARKERBS1001`;
+    res.send(str);
+  });
   app.use("/growtopia/cache*", (req, res, next) => {
     server.log.warn(`Growtopia Client requesting cache: ${req.originalUrl} not found. Redirecting to Growtopia Original CDN...`);
-    const url = `https://ubistatic-a.akamaihd.net/${cdn.uri}/${req.originalUrl.replace("/growtopia/", "")}`;
+    const url = `https://ubistatic-a.akamaihd.net/${server.cdn.uri}/${req.originalUrl.replace("/growtopia/", "")}`;
     res.redirect(url);
     next();
   });
 
-  if (process.env.WEB_ENV === "production") {
-    app.listen(3000, () => {
-      server.log.ready(`Starting development web server on: http://${process.env.WEB_ADDRESS}:3000`);
-      server.log.info(`To register account you need to register at: http://${process.env.WEB_ADDRESS}:3000/register`);
+  app.get("/*", (req, res) => {
+    res.sendFile(path.join(__dirname, "..", "..", "build"));
+  });
+
+  if (!server.config.webserver.development) {
+    return app.listen(3000, () => {
+      server.log.ready(`Starting production web server on: http://${server.config.webserver.address}:3000`);
     });
-  } else if (process.env.WEB_ENV === "development") {
+  } else {
     const httpServer = http.createServer(app);
     const httpsServer = https.createServer(options, app);
+    const httpsServerLogin = https.createServer(options2, app);
 
     httpServer.listen(80);
     httpsServer.listen(443);
+    httpsServerLogin.listen(8080);
 
     httpsServer.on("listening", () => {
-      server.log.ready(`Starting web server on: http://${process.env.WEB_ADDRESS}:80`);
+      server.log.ready(`Starting web server on: http://${server.config.webserver.address}:80`);
     });
+    httpsServerLogin.on("listening", () => {
+      server.log.ready(`Starting login server on: https://${server.config.webserver.loginUrl}`);
+    });
+    return httpServer;
   }
 }

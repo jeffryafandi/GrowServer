@@ -1,11 +1,11 @@
-import { Tank, TankPacket, TextPacket, Variant } from "growtopia.js";
+import { type Tank, TankPacket, TextPacket, Variant } from "growtopia.js";
 import type { Block, EnterArg, Place, WorldData } from "../types";
-import { BaseServer } from "./BaseServer";
-import { WORLD_SIZE, Y_END_DIRT, Y_LAVA_START, Y_START_DIRT } from "../utils/Constants";
-import { TankTypes } from "../utils/enums/TankTypes";
-import { Peer } from "./Peer";
-import { DataTypes } from "../utils/enums/DataTypes";
-import { Tile } from "./Tile";
+import { BaseServer } from "./BaseServer.js";
+import { WORLD_SIZE, Y_END_DIRT, Y_LAVA_START, Y_START_DIRT } from "../utils/Constants.js";
+import { TankTypes } from "../utils/enums/TankTypes.js";
+import { Peer } from "./Peer.js";
+import { DataTypes } from "../utils/enums/DataTypes.js";
+import { Tile } from "./Tile.js";
 
 export class World {
   public data: WorldData = {
@@ -13,7 +13,8 @@ export class World {
     width: 0,
     height: 0,
     blockCount: 0,
-    blocks: []
+    blocks: [],
+    weatherId: 41
   };
   public worldName;
 
@@ -35,26 +36,34 @@ export class World {
     const wrld = this.getWorldCache(this.worldName);
     const world = await this.base.database.getWorld(this.worldName);
     if (world) {
-      await this.base.database.updateWorld({
+      await this.base.database.saveWorld({
         name: wrld.worldName,
-        ownedBy: wrld.data.owner ? `${wrld.data.owner.id}` : null,
+        ownedBy: wrld.data.owner ? wrld.data.owner.id : null,
         blockCount: wrld.data.blockCount,
         width: wrld.data.width,
         height: wrld.data.height,
         blocks: Buffer.from(JSON.stringify(wrld.data.blocks)),
         owner: wrld.data.owner ? Buffer.from(JSON.stringify(wrld.data.owner)) : null,
-        dropped: Buffer.from(JSON.stringify(wrld.data.dropped))
+        dropped: Buffer.from(JSON.stringify(wrld.data.dropped)),
+        updated_at: new Date().toISOString().slice(0, 19).replace("T", " "),
+        weather_id: wrld.data.weatherId,
+        id: 0, // Ignore this (Satisfies type)
+        created_at: "" // Ignore this (Satisfies type),
       });
     } else {
-      await this.base.database.saveWorld({
+      await this.base.database.createWorld({
         name: wrld.data.name,
-        ownedBy: wrld.data.owner ? `${wrld.data.owner.id}` : null,
+        ownedBy: wrld.data.owner ? wrld.data.owner.id : null,
         blockCount: wrld.data.blockCount,
         width: wrld.data.width,
         height: wrld.data.height,
         blocks: Buffer.from(JSON.stringify(wrld?.data.blocks)),
         owner: wrld.data.owner ? Buffer.from(JSON.stringify(wrld.data.owner)) : null,
-        dropped: Buffer.from(JSON.stringify(wrld.data.dropped))
+        dropped: Buffer.from(JSON.stringify(wrld.data.dropped)),
+        updated_at: new Date().toISOString().slice(0, 19).replace("T", " "),
+        weather_id: wrld.data.weatherId,
+        id: 0, // Ignore this (Satisfies type)
+        created_at: "" // Ignore this (Satisfies type)
       });
     }
   }
@@ -98,7 +107,7 @@ export class World {
     peer.everyPeer((p) => {
       if (p.data?.netID !== peer.data?.netID && p.data?.world !== "EXIT" && p.data?.world === peer.data?.world)
         p.send(
-          Variant.from("OnRemove", `netID|${peer.data?.netID}`),
+          Variant.from("OnRemove", `netID|${peer.data?.netID}`, `pId|${peer.data?.id_user}`),
           Variant.from("OnConsoleMessage", `\`5<${peer.name}\`\` left, \`w${this.data.playerCount}\`\` others here\`5>\`\``),
           Variant.from("OnTalkBubble", peer.data.netID, `\`5<${peer.name}\`\` left, \`w${this.data.playerCount}\`\` others here\`5>\`\``),
           TextPacket.from(DataTypes.ACTION, "action|play_sfx", "file|audio/door_shut.wav", "delayMS|0")
@@ -155,12 +164,13 @@ ${peer.data.lastVisitedWorlds
           width: world.width,
           height: world.height,
           blockCount: world.blockCount,
-          blocks: JSON.parse(world.blocks.toString()),
+          blocks: JSON.parse((world.blocks as Buffer).toString()),
           admins: [],
           playerCount: 0,
           jammers: [],
-          dropped: world.dropped,
-          owner: world.owner ? JSON.parse(world.owner.toString()) : null
+          dropped: world.dropped ? JSON.parse(world.dropped.toString()) : { uid: 0, items: [] },
+          owner: world.owner ? JSON.parse(world.owner.toString()) : null,
+          weatherId: world.weather_id || 41
         };
       } else {
         this.generate(true);
@@ -227,7 +237,7 @@ ${peer.data.lastVisitedWorlds
 
         // Weather
         const weatherData = Buffer.alloc(12);
-        weatherData.writeUint16LE(0); // weather id
+        weatherData.writeUint16LE(this.data.weatherId); // weather id
         weatherData.writeUint16LE(0x1, 2); // on atau off (mungkin)
         weatherData.writeUint32LE(0x0, 4); // ??
         weatherData.writeUint32LE(0x0, 8); // ??
@@ -327,7 +337,8 @@ ${peer.data.lastVisitedWorlds
         // separate (maybe?) to different table
         uid: 0,
         items: []
-      }
+      },
+      weatherId: 41
     };
 
     // starting points
@@ -451,7 +462,7 @@ ${peer.data.lastVisitedWorlds
       if (droppedItem.amount + itemInInv.amount > 200) {
         console.log(droppedItem);
         const extra = droppedItem.amount + itemInInv.amount - 200;
-        peer.send(Variant.from("OnConsoleMessage", `Collected \`w${200 - itemInInv.amount} ${item?.name}`));
+        peer.send(Variant.from("OnConsoleMessage", `Collected \`w${200 - itemInInv.amount} ${item?.name?.value}`));
         itemInInv.amount = 200;
 
         this.drop(peer, droppedItem.x, droppedItem.y, droppedItem.id, extra, {
@@ -461,7 +472,7 @@ ${peer.data.lastVisitedWorlds
       } else {
         if (droppedItem.id !== 112) {
           itemInInv.amount += droppedItem.amount;
-          peer.send(Variant.from("OnConsoleMessage", `Collected \`w${droppedItem.amount} ${item?.name}`));
+          peer.send(Variant.from("OnConsoleMessage", `Collected \`w${droppedItem.amount} ${item?.name?.value}`));
         } else {
           peer.data.gems += droppedItem.amount;
         }
@@ -469,7 +480,7 @@ ${peer.data.lastVisitedWorlds
     } else {
       if (droppedItem.id !== 112) {
         peer.addItemInven(droppedItem.id, droppedItem.amount);
-        peer.send(Variant.from("OnConsoleMessage", `Collected \`w${droppedItem.amount} ${item?.name}`));
+        peer.send(Variant.from("OnConsoleMessage", `Collected \`w${droppedItem.amount} ${item?.name?.value}`));
       } else {
         peer.data.gems += droppedItem.amount;
       }

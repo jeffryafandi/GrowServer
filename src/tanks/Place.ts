@@ -1,14 +1,14 @@
-import { ItemDefinition, Tank, TankPacket, Variant } from "growtopia.js";
-import { BaseServer } from "../structures/BaseServer";
-import { Peer } from "../structures/Peer";
-import { World } from "../structures/World";
-import { Role } from "../utils/Constants";
-import { TankTypes } from "../utils/enums/TankTypes";
-import { ActionTypes } from "../utils/enums/Tiles";
-import { PlacedArg, Block } from "../types";
-import { Floodfill } from "../structures/FloodFill";
-import { BlockFlags } from "../utils/enums/ItemTypes";
-import { Tile } from "../structures/Tile";
+import { type ItemDefinition, type Tank, TankPacket, Variant } from "growtopia.js";
+import { BaseServer } from "../structures/BaseServer.js";
+import { Peer } from "../structures/Peer.js";
+import { World } from "../structures/World.js";
+import { Role } from "../utils/Constants.js";
+import { TankTypes } from "../utils/enums/TankTypes.js";
+import { ActionTypes } from "../utils/enums/Tiles.js";
+import type { PlacedArg, Block } from "../types";
+import { Floodfill } from "../structures/FloodFill.js";
+import { BlockFlags } from "../utils/enums/ItemTypes.js";
+import { Tile } from "../structures/Tile.js";
 
 export class Place {
   public base: BaseServer;
@@ -298,6 +298,85 @@ export class Place {
           id: p.id
         });
 
+        return true;
+      }
+
+      case ActionTypes.MANNEQUIN: {
+        p.block.mannequin = {
+          label: "",
+          hairColor: 0,
+          hair: 12288,
+          shirt: 0,
+          pants: 0,
+          feet: 0,
+          face: 0,
+          hand: 0,
+          back: 0,
+          mask: 0,
+          neck: 0
+        };
+
+        this.world.place({
+          peer: this.peer,
+          x: p.block.x,
+          y: p.block.y,
+          isBg: p.isBg,
+          id: p.id
+        });
+
+        this.tileUpdate(p.actionType, p.block);
+
+        return true;
+      }
+
+      case ActionTypes.WEATHER_MACHINE: {
+        p.block.toggleable = {
+          open: false,
+          public: false
+        };
+
+        this.world.place({
+          peer: this.peer,
+          x: p.block.x,
+          y: p.block.y,
+          isBg: p.isBg,
+          id: p.id
+        });
+
+        this.tileUpdate(p.actionType, p.block);
+        return true;
+      }
+
+      case ActionTypes.DICE: {
+        p.block.dice = 0;
+
+        this.world.place({
+          peer: this.peer,
+          x: p.block.x,
+          y: p.block.y,
+          isBg: p.isBg,
+          id: p.id
+        });
+
+        this.tileUpdate(p.actionType, p.block);
+        return true;
+      }
+
+      case ActionTypes.SWITCHEROO: {
+        p.block.toggleable = {
+          open: false,
+          public: false
+        };
+
+        this.world.place({
+          peer: this.peer,
+          x: p.block.x,
+          y: p.block.y,
+          isBg: p.isBg,
+          id: p.id
+        });
+
+        this.tileUpdate(p.actionType, p.block);
         return true;
       }
 

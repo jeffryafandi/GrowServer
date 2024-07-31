@@ -1,8 +1,8 @@
-import { Action } from "../abstracts/Action";
-import { Peer } from "../structures/Peer";
-import { BaseServer } from "../structures/BaseServer";
-import { ActionType } from "../types";
-import { DialogBuilder } from "../utils/builders/DialogBuilder";
+import { Action } from "../abstracts/Action.js";
+import { Peer } from "../structures/Peer.js";
+import { BaseServer } from "../structures/BaseServer.js";
+import type { ActionType } from "../types";
+import { DialogBuilder } from "../utils/builders/DialogBuilder.js";
 import { Variant } from "growtopia.js";
 
 export default class extends Action {
@@ -20,7 +20,7 @@ export default class extends Action {
 
     const dialog = new DialogBuilder()
       .defaultColor()
-      .addLabelWithIcon(`\`4Trash\`\` ${item?.name}`, item?.id || 0, "big")
+      .addLabelWithIcon(`\`4Trash\`\` ${item?.name?.value}`, item?.id || 0, "big")
       .addTextBox(`How many to \`4destroy\`\`? (you have ${peerItem?.amount})`)
       .addInputBox("trash_count", "", peerItem?.amount, 5)
       .embed("itemID", itemID)

@@ -1,11 +1,11 @@
-import { Tank, TankPacket, Variant } from "growtopia.js";
-import { BaseServer } from "../structures/BaseServer";
-import { Peer } from "../structures/Peer";
-import { World } from "../structures/World";
-import { ActionTypes } from "../utils/enums/Tiles";
-import { DialogBuilder } from "../utils/builders/DialogBuilder";
-import { AbilityType } from "../types";
-import { Ability } from "../utils/enums/Character";
+import { type Tank, TankPacket, Variant } from "growtopia.js";
+import { BaseServer } from "../structures/BaseServer.js";
+import { Peer } from "../structures/Peer.js";
+import { World } from "../structures/World.js";
+import { ActionTypes } from "../utils/enums/Tiles.js";
+import { DialogBuilder } from "../utils/builders/DialogBuilder.js";
+import type { AbilityType } from "../types";
+import { Ability } from "../utils/enums/Character.js";
 
 export class Player {
   public base: BaseServer;
@@ -75,7 +75,7 @@ export class Player {
         }
         const dialog = new DialogBuilder()
           .defaultColor()
-          .addLabelWithIcon(`\`wEdit ${itemMeta.name}\`\``, itemMeta.id as number, "big")
+          .addLabelWithIcon(`\`wEdit ${itemMeta.name?.value}\`\``, itemMeta.id as number, "big")
           .addTextBox("What would you like to write on this sign?")
           .addInputBox("label", "", block.sign?.label, 100)
           .embed("tilex", block.x)
@@ -95,7 +95,7 @@ export class Player {
         }
         const dialog = new DialogBuilder()
           .defaultColor()
-          .addLabelWithIcon(`\`wEdit ${itemMeta.name}\`\``, itemMeta.id as number, "big")
+          .addLabelWithIcon(`\`wEdit ${itemMeta.name?.value}\`\``, itemMeta.id as number, "big")
           .addInputBox("label", "Label", block.door?.label, 100)
           .addInputBox("target", "Destination", block.door?.destination, 24)
           .addSmallText("Enter a Destination in this format: `2WORLDNAME:ID``")
@@ -120,7 +120,7 @@ export class Player {
 
           const dialog = new DialogBuilder()
             .defaultColor()
-            .addLabelWithIcon(`\`wEdit ${itemMeta.name}\`\``, itemMeta.id as number, "big")
+            .addLabelWithIcon(`\`wEdit ${itemMeta.name?.value}\`\``, itemMeta.id as number, "big")
             .embed("lockID", mLock.id)
             .embed("tilex", block.x)
             .embed("tiley", block.y)
