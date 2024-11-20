@@ -30,8 +30,6 @@ const apiLimiter = rateLimit({
 });
 
 export async function WebServer(server: BaseServer) {
-  if (!existsSync("./assets/cache.zip")) throw new Error("Could not find 'cache.zip' file, please get one from growtopia 'cache' folder & compress the 'cache' folder into zip file.");
-
   app.use(express.urlencoded({ extended: true }));
   app.use(express.json());
   app.use("/public", express.static(path.join(__dirname, "../../website/public")));
@@ -42,7 +40,7 @@ export async function WebServer(server: BaseServer) {
     app.use("/growtopia/cache", express.static(path.join(__dirname, "../../assets/cache")));
   }
 
-  app.use("/", express.static(path.join(__dirname, "..", "..", "build")));
+  app.use("/", express.static(path.join(__dirname, "..", "..", "assets", "website")));
 
   app.use("/api", ApiRouter(server));
 
@@ -53,7 +51,7 @@ export async function WebServer(server: BaseServer) {
     let str = "";
     const conf = server.config.webserver;
 
-    if (server.cdn.version === req.body.version) str += `server|${conf.address}\n`;
+    if (server.cdn.version === req.body.version || server.config.bypassVersionCheck) str += `server|${conf.address}\n`;
     else {
       str += `error|1000|Update is now available for your device.  Go get it!  You'll need to install it before you can play online.\nurl|${req.body.platform === "0" ? "https://growtopiagame.com/Growtopia-Installer.exe" : "market://details?id=com.rtsoft.growtopia"}\n`;
     }
@@ -69,7 +67,7 @@ export async function WebServer(server: BaseServer) {
   });
 
   app.get("/*", (req, res) => {
-    res.sendFile(path.join(__dirname, "..", "..", "build"));
+    res.sendFile(path.join(__dirname, "..", "..", "assets", "website"));
   });
 
   if (!server.config.webserver.development) {

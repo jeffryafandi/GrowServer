@@ -43,7 +43,7 @@ export class BaseServer {
 
   constructor() {
     this.config = Config;
-    this.server = new Client({ https: { enable: false } });
+    this.server = new Client();
     this.items = {
       hash: `${hashItemsDat(fs.readFileSync("./assets/dat/items.dat"))}`,
       content: fs.readFileSync("./assets/dat/items.dat"),
@@ -86,9 +86,7 @@ export class BaseServer {
   }
 
   public async start() {
-    this.log.info("Please wait extracting cache.zip");
-    await decompress("assets/cache.zip", "assets/cache");
-    this.log.ready("Successfully extracting cache.zip");
+
 
     this.#_loadItems().then(async () => {
       this.log.ready("Items data ready!");

@@ -4,7 +4,8 @@ dist
 dist-ssr
 yarn.lock
 data
-assets/cache/
+assets/website/
+assets/build.zip
 build
 
 
