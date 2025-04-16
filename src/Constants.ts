@@ -1,3 +1,6 @@
+export const ITEMS_DAT_URL = "https://raw.githubusercontent.com/StileDevs/itemsdat-archive/refs/heads/main";
+export const ITEMS_DAT_FETCH_URL = "https://raw.githubusercontent.com/StileDevs/itemsdat-archive/refs/heads/main/latest.json";
+
 export enum PacketTypes {
   HELLO = 1,
   STR = 2,
@@ -6,7 +9,7 @@ export enum PacketTypes {
 }
 
 export const WORLD_SIZE = {
-  WIDTH: 100,
+  WIDTH:  100,
   HEIGHT: 60
 };
 
@@ -17,7 +20,7 @@ export const Y_END_DIRT = 55;
 
 export const ROLE = {
   DEVELOPER: "1",
-  BASIC: "2",
+  BASIC:     "2",
   SUPPORTER: "3"
 };
 
@@ -35,16 +38,16 @@ export enum ClothTypes {
 }
 
 export const CLOTH_MAP: { [key in ClothTypes]: string } = {
-  [ClothTypes.ANCES]: "ances",
-  [ClothTypes.BACK]: "back",
-  [ClothTypes.FACE]: "face",
-  [ClothTypes.FEET]: "feet",
-  [ClothTypes.HAIR]: "hair",
-  [ClothTypes.HAND]: "hand",
-  [ClothTypes.MASK]: "mask",
+  [ClothTypes.ANCES]:    "ances",
+  [ClothTypes.BACK]:     "back",
+  [ClothTypes.FACE]:     "face",
+  [ClothTypes.FEET]:     "feet",
+  [ClothTypes.HAIR]:     "hair",
+  [ClothTypes.HAND]:     "hand",
+  [ClothTypes.MASK]:     "mask",
   [ClothTypes.NECKLACE]: "necklace",
-  [ClothTypes.PANTS]: "pants",
-  [ClothTypes.SHIRT]: "shirt"
+  [ClothTypes.PANTS]:    "pants",
+  [ClothTypes.SHIRT]:    "shirt"
 };
 
 export enum TankTypes {
@@ -112,6 +115,7 @@ export enum TileFlags {
 export enum TileExtraTypes {
   NONE = 0,
   DOOR = 1,
+  // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
   MAIN_DOOR = 1,
   SIGN = 2,
   LOCK = 3,
@@ -333,25 +337,25 @@ export enum ActionTypes {
 
 export const LOCKS = [
   {
-    id: 202, // Small Lock
+    id:       202, // Small Lock
     maxTiles: 10
   },
   {
-    id: 204, // Big Lock
+    id:       204, // Big Lock
     maxTiles: 48
   },
   {
-    id: 206, // Huge Lock
+    id:       206, // Huge Lock
     maxTiles: 200
   },
   {
-    id: 4994, // Builder's Lock
+    id:       4994, // Builder's Lock
     maxTiles: 200
   }
 ];
 
 export const TileIgnore = {
-  blockIDsToIgnoreByLock: [6, 8],
+  blockIDsToIgnoreByLock:   [6, 8],
   blockActionTypesToIgnore: [ActionTypes.LOCK, ActionTypes.MAIN_DOOR]
 };
 

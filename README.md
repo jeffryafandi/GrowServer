@@ -1,14 +1,14 @@
 ![Example](/assets/ignore/banner.png)
 
-> A Growtopia private server using Node.js
+> A Growtopia private server built with Node.js and Bun.js, powered by [growtopia.js](https://github.com/JadlionHD/growtopia.js)
 
 > [!NOTE]
 > This source is not production ready yet. In the future it will be using a Docker to deploy the server, feel free to join [Discord Server](https://discord.gg/sGrxfKZY5t) to discuss regarding this.
 
 ## Requirements
 
-- Node.js v18+ (Recommended LTS v20)
-- npm (Included on Node.js) (Recommended [pnpm](https://pnpm.io))
+- [Node.js](https://nodejs.org) v20+ or [Bun.js](https://bun.sh) v1.2.9+
+- [pnpm](https://pnpm.io)
 - [mkcert](https://github.com/FiloSottile/mkcert)
 
 ## Setup
@@ -16,22 +16,14 @@
 To setup the server, first install necessary packages & settings by
 
 ```
-$ npm install
+$ pnpm install
 ```
 
 And congrats setup are done, simple as that!
 Now you just need to run the server by
 
 ```
-$ npm run dev
-```
-
-## Enviroment file
-
-Example for default .env file (Generated automatically)
-
-```
-DISCORD_BOT_TOKEN=Tokxxxxxxxen
+$ pnpm run dev
 ```
 
 ## Database
@@ -42,7 +34,7 @@ And for the ORM we are using [Drizzle-ORM](https://orm.drizzle.team/)
 To view the database you can run this command below:
 
 ```
-$ npm run studio
+$ pnpm run studio
 ```
 
 and access it on here https://local.drizzle.studio/
@@ -52,7 +44,7 @@ and access it on here https://local.drizzle.studio/
 To run the development server by
 
 ```
-$ npm run start
+$ pnpm run start
 ```
 
 ## Development
@@ -64,7 +56,7 @@ In order to make new login system work you need to install [mkcert](https://gith
 Install the mkcert local CA by
 
 ```
-$ npm run mkcert:setup
+$ mkcert -install
 ```
 
 ### Hosts
@@ -83,17 +75,17 @@ Any contributions are welcome.
 
 There's few rules of contributing:
 
-- Code must match the existing code style. Please make sure to run `npm run lint` before submiting a PR.
+- Code must match the existing code style. Please make sure to run `pnpm run lint` before submiting a PR.
 - The commit must take review first before merging into `main` branch.
 
 ## Links
 
 - [Discord Server](https://discord.gg/sGrxfKZY5t)
 
-## Credits
+## Contributors
 
-Give a thumbs to these cool people:
+Give a thumbs to these cool contributors:
 
-- [Alexander (Syn9673)](https://github.com/Syn9673)
-- [Restart](https://github.com/iRestartz)
-- [Ritshu](https://github.com/Ritshu)
+<a href="https://github.com/StileDevs/GrowServer">
+  <img src="https://contrib.rocks/image?repo=StileDevs/GrowServer"/>
+</a
