@@ -18,10 +18,10 @@ export default defineNuxtConfig({
   ],
 
 
-  // devServer: {
-  //   host: '0.0.0.0', // Listen on all network interfaces
-  //   port: 3000
-  // },
+  devServer: {
+    host: '0.0.0.0', // Listen on all network interfaces
+    port: 3000
+  },
   vite: {
     server: {
       allowedHosts: [
@@ -31,6 +31,7 @@ export default defineNuxtConfig({
   },
 
   css: ["~/assets/css/main.css"],
+
   app: {
     head: {
       title: "GrowServer", // default fallback title

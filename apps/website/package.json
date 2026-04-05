@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "nuxt build",
-    "dev": "nuxt dev",
+    "dev": "nuxt dev --host 0.0.0.0 --port 3000 --dotenv ../../.env",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare"
@@ -24,10 +24,14 @@
     "@nuxtjs/i18n": "^10.2.1",
     "@nuxtjs/turnstile": "^1.1.1",
     "@pinia/nuxt": "^0.11.3",
+    "@types/bcryptjs": "^3.0.0",
+    "@types/jsonwebtoken": "^9.0.10",
     "@unhead/vue": "^2.0.3",
+    "bcryptjs": "^3.0.2",
     "clsx": "^2.1.1",
     "dayjs": "^1.11.19",
     "eslint": "^9.0.0",
+    "jsonwebtoken": "^9.0.2",
     "ky": "^1.10.0",
     "motion-v": "^1.7.4",
     "nanoid": "5.1.5",

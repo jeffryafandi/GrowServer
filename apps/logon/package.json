@@ -4,7 +4,7 @@
     "bun": "cross-env RUNTIME_ENV=bun bun run --bun",
     "node": "cross-env RUNTIME_ENV=node node",
     "tsx": "cross-env RUNTIME_ENV=node tsx",
-    "dev": "nr tsx watch src/index.ts || nr bun src/index.ts",
+    "dev": "nr tsx --env-file=../../.env watch src/index.ts || nr bun src/index.ts",
     "setup": "nr tsx scripts/setup.ts || nr bun scripts/setup.ts",
     "clean": "rimraf .cache dist",
     "build": "tsc",

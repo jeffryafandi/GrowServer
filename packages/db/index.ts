@@ -1,4 +1,4 @@
-export * from "./Database";
+export { Database } from "./Database";
 export * from "./shared";
 export * from "./auth";
 export * from "./handlers/PlayerHandler";

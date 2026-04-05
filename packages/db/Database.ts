@@ -34,7 +34,13 @@ export class Database {
   public redis: RedisHandler;
 
   constructor() {
-    this.connection = new MongoClient(process.env.DATABASE_URL as string);
+    if (!process.env.DATABASE_URL) {
+      throw new Error(
+        "DATABASE_URL environment variable is not set. " +
+        "Make sure the root .env file is loaded (e.g. via --env-file or --dotenv flag)."
+      );
+    }
+    this.connection = new MongoClient(process.env.DATABASE_URL);
 
     this.db = this.connection.db();
     this.auth = betterAuth(Object.assign({
@@ -49,8 +55,12 @@ export class Database {
   }
 
   public async setup() {
+    // Connect Mongoose (used by PlayerModel, WorldModel, etc.)
+    if (mongoose.connection.readyState === 0) {
+      await mongoose.connect(process.env.DATABASE_URL as string);
+    }
     await this.redis.connect();
-    await setupSeeds();
+    // await setupSeeds();
   }
 
   public async close() {

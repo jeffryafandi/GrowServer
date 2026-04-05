@@ -29,7 +29,7 @@ https://localhost:443, https://www.growtopia1.com:443, https://www.growtopia2.co
 growserver.app {
 
     # Please comment this if you using actual domain
-    #tls internal
+    tls internal
     
     reverse_proxy host.docker.internal:3000 {
         header_up Upgrade {http.request.header.Upgrade}
