@@ -1,11 +1,14 @@
 import dayjs from "dayjs";
 import { ServerState } from "@growserver/const";
-import { Collection, ExtendBuffer } from "@growserver/utils";
+import { Collection } from "@growserver/utils";
 import { Client } from "growtopia.js";
 import { CooldownOptions, PeerData, WorldData } from "@growserver/types";
 import { Debug, ThrowError } from "@/decorators";
 import { Database } from "@growserver/db";
 import logger from "@growserver/logger";
+import { ConnectListener } from "@/events/Connect";
+import { DisconnectListener } from "@/events/Disconnect";
+import { RawListener } from "@/events/Raw";
 
 interface CacheEntry<T> {
   data: T;
@@ -31,14 +34,74 @@ export class Server {
     this.stats = new ServerStats();
   }
 
+  /**
+   * Wire up ENet event listeners (connect / disconnect / raw).
+   * Must be called after server.listen().
+   */
+  public loadEvents(): void {
+    const connect    = new ConnectListener(this);
+    const disconnect = new DisconnectListener(this);
+    const raw        = new RawListener(this);
+
+    this.server.on("connect",    (netID)                   => connect.run(netID));
+    this.server.on("disconnect", (netID)                   => disconnect.run(netID));
+    this.server.on("raw",        (netID, channelID, data)  => raw.run(netID, channelID, data));
+  }
+
+  /**
+   * Number of online peers, optionally excluding certain netIDs.
+   */
+  public getPlayersOnline(ignoredNetIDs: number[] = [0]): number {
+    let count = 0;
+    this.data.getAllPeers().forEach((_, netID) => {
+      if (!ignoredNetIDs.includes(netID)) count++;
+    });
+    return count;
+  }
+
+  /**
+   * Save all peers to database and optionally disconnect them.
+   */
+  public async saveAll(disconnectAll = false): Promise<boolean> {
+    logger.info(`[Port ${this.port}] Saving ${this.getPlayersOnline()} peers`);
+    let ok = true;
+
+    for (const [netID, peerData] of this.data.getAllPeers()) {
+      try {
+        if (peerData.name) {
+          await this.database.player.update(peerData.name, {
+            displayName:       peerData.displayName,
+            role:              peerData.role,
+            clothing:          peerData.clothing,
+            inventory:         peerData.inventory,
+            gems:              peerData.gems,
+            level:             peerData.level,
+            exp:               peerData.exp,
+            lastVisitedWorlds: peerData.lastVisitedWorlds ?? [],
+          });
+        }
+        if (disconnectAll) {
+          // Lazy-import Peer to avoid circular dependency
+          const { Peer } = await import("@/core/Peer");
+          const p = new Peer(this, netID);
+          p.disconnect("now");
+        }
+      } catch (e) {
+        logger.error(`Failed to save peer ${netID}: ${e}`);
+        ok = false;
+      }
+    }
+
+    return ok;
+  }
+
   @Debug()
   @ThrowError("Failed to shutdown server")
-  public shutdown() {
+  public async shutdown() {
     this.stats.setState(ServerState.STOPPING);
-
+    await this.saveAll(true);
     this.server.host.flush();
     this.stats.updateShutdownNow();
-
     this.stats.setState(ServerState.STOPPED);
   }
 }
@@ -106,30 +169,21 @@ export class ServerData {
   }
 
   /**
-   * Get a peer from cache, or load from database if not found
+   * Get a peer from cache by name.
+   * NOTE: In enet-server, PeerData is runtime state seeded at login —
+   * the DB document does not carry fields like netID, world, state, etc.
+   * So this method only searches the in-memory cache.
    */
   @Debug()
-  @ThrowError("Failed to get or load peer")
-  public async getOrLoadPeer(name: string): Promise<PeerData | undefined> {
-    // First, try to find in cache by iterating through cached peers
-    for (const [netID, entry] of this.peers) {
+  public getPeerByName(name: string): PeerData | undefined {
+    for (const [, entry] of this.peers) {
       if (entry.data.name === name && !this.isExpired(entry)) {
         entry.lastAccessed = Date.now();
-        logger.debug(`Peer ${name} found in cache (netID: ${netID})`);
+        logger.debug(`Peer ${name} found in cache`);
         return entry.data;
       }
     }
-
-    // Not in cache, load from database
-    logger.debug(`Peer ${name} not in cache, loading from database`);
-    const peerData = await this.database.player.get(name);
-
-    if (peerData && peerData.netID !== undefined) {
-      this.setPeer(peerData.netID, peerData);
-      logger.debug(`Peer ${name} loaded from database and cached`);
-    }
-
-    return peerData;
+    return undefined;
   }
 
   /**
@@ -182,29 +236,52 @@ export class ServerData {
   }
 
   /**
-   * Get a world from cache, or load from database if not found
+   * Get a world from cache, or load and map from database if not found.
    */
   @Debug()
   @ThrowError("Failed to get or load world")
   public async getOrLoadWorld(worldName: string): Promise<WorldData | undefined> {
     const entry = this.worlds.get(worldName);
 
-    // Check if world exists in cache and is not expired
+    // Return cached if fresh
     if (entry && !this.isExpired(entry)) {
       entry.lastAccessed = Date.now();
       logger.debug(`World ${worldName} found in cache`);
       return entry.data;
     }
 
-    // Not in cache or expired, load from database
+    // Not in cache or expired — load from database and map to WorldData
     logger.debug(`World ${worldName} not in cache, loading from database`);
-    const worldData = await this.database.world.get(worldName);
+    const doc = await this.database.world.get(worldName);
+    if (!doc) return undefined;
 
-    if (worldData) {
-      this.setWorld(worldName, worldData);
-      logger.debug(`World ${worldName} loaded from database and cached`);
-    }
+    const { ExtendBuffer } = await import("@growserver/utils");
+    const tileMap = new ExtendBuffer(0);
+    tileMap.data = doc.tilesData as Buffer;
 
+    const worldData: WorldData = {
+      name:       doc.name,
+      width:      doc.width,
+      height:     doc.height,
+      tileMap,
+      tileExtras: (doc.extras ?? []).map((e: { id: number; x: number; y: number; data?: unknown }) => ({
+        id:   e.id,
+        x:    e.x,
+        y:    e.y,
+        data: e.data ?? undefined,
+      })),
+      dropped: {
+        uidCount: (doc as { droppedUidCounter?: number }).droppedUidCounter ?? 0,
+        items:    (doc as { droppedItems?: unknown[] }).droppedItems as WorldData["dropped"]["items"] ?? [],
+      },
+      weather: {
+        id:       doc.weather?.id ?? 41,
+        heatWave: doc.weather?.heatWave ?? { r: 0, g: 0, b: 0 },
+      },
+    };
+
+    this.setWorld(worldName, worldData);
+    logger.debug(`World ${worldName} loaded from database and cached`);
     return worldData;
   }
 

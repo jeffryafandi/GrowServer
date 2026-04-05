@@ -7,8 +7,8 @@ http://:80 {
     }
 }
 
-# HTTPS for localhost and www.growtopia1.com (uses custom certificate for Growtopia login)
-https://localhost:443, https://www.growtopia1.com:443 {
+# HTTPS for localhost, www.growtopia1.com, www.growtopia2.com (uses custom certificate for Growtopia login)
+https://localhost:443, https://www.growtopia1.com:443, https://www.growtopia2.com:443 {
     tls apps/logon/assets/ssl/server.crt apps/logon/assets/ssl/server.key
 
     handle /growtopia/server_data.php {

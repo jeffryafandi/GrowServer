@@ -24,33 +24,30 @@ export async function setupSeeds() {
 
     const db = new Database();
 
-     await db.player.register({
-      username: "admin",
-      displayName: "admin",
-      email: "admin@growserver.dev",
-      password: "admin",
-      role: "admin",
-      emailVerified: true,
+    await db.player.register({
+      username:     "admin",
+      displayName:  "admin",
+      email:        "admin@growserver.dev",
+      password:     "admin",
+      role:         "admin",
       inventoryMax: 32,
     });
 
     await db.player.register({
-      username: "reimu",
-      displayName: "Reimu",
-      email: "reimu@hakurei.shrine",
-      password: "hakurei",
-      role: "user",
-      emailVerified: true,
+      username:     "reimu",
+      displayName:  "Reimu",
+      email:        "reimu@hakurei.shrine",
+      password:     "hakurei",
+      role:         "user",
       inventoryMax: 16,
     });
 
     await db.player.register({
-      username: "jadlionhd",
-      displayName: "JadlionHD",
-      email: "jadlionhd@growserver.dev",
-      password: "admin",
-      role: "admin",
-      emailVerified: true,
+      username:     "jadlionhd",
+      displayName:  "JadlionHD",
+      email:        "jadlionhd@growserver.dev",
+      password:     "admin",
+      role:         "admin",
       inventoryMax: 32,
     });
 

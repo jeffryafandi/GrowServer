@@ -44,6 +44,7 @@ export class WorldHandler {
       throw new Error(`World with name "${name}" already exists`);
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const world = await WorldModel.create({
       name:      name.toUpperCase(),
       width,
@@ -59,7 +60,7 @@ export class WorldHandler {
           b: weather?.heatWave?.b || 0,
         },
       },
-    });
+    } as any);
 
     return world;
   }
@@ -215,7 +216,8 @@ export class WorldHandler {
       await mongoose.connect(process.env.DATABASE_URL as string);
     }
 
-    let query = WorldModel.find({ "owner.userId": playerId }).populate("owner.userId");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let query = WorldModel.find({ "owner.userId": new Types.ObjectId(playerId) } as any).populate("owner.userId");
 
     if (skip) query = query.skip(skip);
     if (limit) query = query.limit(limit);

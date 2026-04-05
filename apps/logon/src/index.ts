@@ -1,7 +1,6 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { config, logon } from "@growserver/config";
-import { createServer } from "https";
 import logger from "@growserver/logger";
 
 async function init() {
@@ -16,16 +15,21 @@ async function init() {
   });
 
   app.all("/growtopia/server_data.php", (ctx) => {
-    let str = "";
-
-    str += `server|${config.web.address}\n`;
-
     const randPort =
       config.web.ports[Math.floor(Math.random() * config.web.ports.length)];
 
-    str += `port|${randPort}\nloginurl|${config.web.loginUrl}\ntype|1\n${config.web.maintenance.enable ? "maint" : "#maint"}|
-      ${config.web.maintenance.message}
-      \ntype2|1\nmeta|ignoremeta\nRTENDMARKERBS1001`;
+    const maintKey = config.web.maintenance.enable ? "maint" : "#maint";
+
+    const str = [
+      `server|${config.web.address}`,
+      `port|${randPort}`,
+      `loginurl|${config.web.loginUrl}`,
+      `type|1`,
+      `${maintKey}|${config.web.maintenance.message}`,
+      `type2|1`,
+      `meta|ignoremeta`,
+      `RTENDMARKERBS1001`,
+    ].join("\n");
 
     return ctx.body(str);
   });

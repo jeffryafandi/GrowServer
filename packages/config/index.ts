@@ -9,6 +9,7 @@ const getConfigPath = (): string => {
   if (typeof __dirname !== "undefined") {
     currentDir = __dirname;
   } else {
+    // @ts-ignore — import.meta is valid in ESM; this branch is unreachable under CommonJS
     currentDir = dirname(fileURLToPath(import.meta.url));
   }
   
